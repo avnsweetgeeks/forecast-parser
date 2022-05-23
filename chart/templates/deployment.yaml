@@ -30,23 +30,13 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           volumeMounts:
-            - mountPath: /forecast-files/
+            - mountPath: /app/weatherforecast/
               name: forecast-input
           env:
-            - name: KAFKA_TOPIC
-              value: {{ .Values.kafka.topic | quote }}
-            - name: KAFKA_HOST
-              value: {{ .Values.kafka.host | quote }}
-            - name: KSQL_HOST
-              value: {{ .Values.ksql.host | quote }}
-              {{- if .Values.Debug }}
-            - name: DEBUG
-              value: {{ .Values.Debug | quote }}
-              {{- end }}
-              {{- if .Values.MockData }}
-            - name: USE_MOCK_DATA
-              value: {{ .Values.MockData | quote }}
-              {{- end }}
+          {{- range $name, $value := .Values.EnvVars }}
+            - name: {{ $name }}
+              value: {{ $value | quote}}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:

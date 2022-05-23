@@ -1,53 +1,52 @@
 # Forecast Parser
 
-A container that parses forecast-files and provides them to a kafka-broker in smaller chunks.
+A container that parses forecast-files and provides access to them via an API.
 
 ## Description
 
-This repo contains a python-script that will read/parse forecast files provided by DMI (Danmarks Meteorologiske Institut) (including relayed data from ECMWF) and ConWx. The data will be split into smaller chunks and passed to a Kafka-broker. Furthermore there is a kSQL configuration that will split the kafka-stream into several smaller kSQL streams and tables that will be applied if kSQL is found. The script is intended to be run as part of a container/kubernetes, so a Dockerfile is provided as well, as is a set of helm charts with a default configuration.
+This repo contains a python-script that will read/parse forecast files provided by DMI (Danmarks Meteorologiske Institut) (including relayed data from ECMWF) and ConWx. The data will be joined into a single pandas DataFrame and served via a REST API accepting SQL queries. The script is intended to be run as part of a container/kubernetes, so a Dockerfile is provided as well, as is a set of helm charts with a default configuration.
 
 ### Exposed environment variables:
 
 | Name | Default value | Description |
 |--|--|--|
-|DEBUG|(not set)|Set to 'TRUE' to enable very verbose debugging log|
-|KAFKA_TOPIC|weather-forecast-raw|The topic the script will post messages to on the kafka-broker|
-|KAFKA_HOST|(not set)|Required: Host-name or IP of the kafka-broker incl. port|
-|KSQL_HOST|(not set)|Optional: Host-name or IP of the kSQL server incl. port|
-|USE_MOCK_DATA|(not set)|Set to 'TRUE' to enable creating mock forecast files|
+|LOGLEVEL|"INFO"|Used to set log-level (set to DEBUG to show debug messages)|
+|API_DBNAME|"weather_forecast"|Database name for use in the SQL query|
+|API_PORT|5000|Port for accessing the API|
+|USE_MOCK_DATA|"FALSE"|Set to true to generate mock-data (used for testing)|
+
+More environment variables have been exposed, but will rarely be used. They can be found in the values.yaml file in the chart directory.
 
 ### File handling / Input
 
-Every 5 seconds the '/forecast-files/' folder is scanned for new files. Files that fit the name-filter will be parsed one by one and then deleted (other files will be ignored). The files must fit the agreed structure (examples can be found in the '/tests/valid-testdata/' subfolder) and naming, otherwise it will most likely break execution and not be able to recover (an issue has been rasied for this).
+Every 10 seconds the '/app/weatherforecasts/' folder is scanned for new files. Files that fit given name-filters will be parsed one by one (and deleted) starting with the oldest first. The structure and contents of the files must fit the agreed structure (examples can be found in the '/tests/valid-testdata/' subfolder) and naming, otherwise the file will not be loaded. Be aware that any new valid forecast-file will overwrite old data of same forecast-type (i.e. a new ConWx file will overwrite the last ConWx forecast).
 
 #### Using MOCK data
 
-The container has an option to generate mock-data. This is done by taking the test-data files and changing their timestamps and dumping them into the input directory. This can be used if real forecast files are not available. Be aware that all forecast data will be identical and thereby not dynamic/changing.
+The container has an option to generate mock-data. This is done by taking the test-data files and changing their timestamps and dumping them into the input directory. This can be used if real forecast files are not available. The function will update timestamps and add new forecasts regularly, to simulate incoming data, but be aware that the forecast data itself will not change.
 
-### Kafka messages / Output
+### API
 
-Messages are sent to the kafka broker in json format with the following structure:
+The DataFrame is made available through a REST API which accepts SQL-queries. More information on the API itself can be found [here](https://github.com/energinet-singularity/singupy/tree/main/singupy#class-apidataframeapi).
 
+The dataframe contains the following columns/indexes:
 | Name | type | description |
 |--|--|--|
-|estimation_time|VARCHAR|Time the estimation was generated|
-|estimation_source|VARCHAR|Filename of the source|
-|lon_lat_key|VARCHAR|Unique key for each location in style x.xx_y.yy (not used)|
-|position_lon|DOUBLE|Longitude position (nearest match in csv gridpoint lookup)|
-|position_lat|DOUBLE|Lattitude position (nearest match in csv gridpoint lookup)|
-|forecast_type|VARCHAR|Type of the source (usually first part of the filename)|
-|forecast_time|ARRAY\<VARCHAR\>|The hour the forecast is for (YYYYMMDDHH)|
-|temperature_2m|ARRAY\<DOUBLE\>|Temperature (K) at 2m|
-|temperature_100m|ARRAY\<DOUBLE\>|Temperature (K) at 100m|
-|wind_speed_10m|ARRAY\<DOUBLE\>|Wind speed (m/s) at 10m|
-|wind_direction_10m|ARRAY\<DOUBLE\>|Wind direction (deg) at 10m|
-|wind_speed_100m|ARRAY\<DOUBLE\>|Wind speed (m/s) at 100m|
-|wind_direction_100m|ARRAY\<DOUBLE\>|Wind direction (deg) at 100m|
-|direct_radiation|ARRAY\<DOUBLE\>|Short wave radiation (solar W/m2)|
-|global_radiation|ARRAY\<DOUBLE\>|Short wave radiation per hour|
-|accumulated_global_radiation|ARRAY\<DOUBLE\>|Accumulated daliy radiation (W/m2)|
-
-The data-arrays are structured in such a way that each row fits a timestamp in the forecast_time array. In kSQL the data is split into three seperate streams and tables where the arrays have been "exploded" so each message in these represents a single hour in time. In the table, the newest estimate will always replace older ones (this has not been documented further here). Depending on what the forecast-file contains, some of the data-arrays may contain zeros or not be included at all in the output.
+|lon|float|Longitude of measurement point|
+|lat|float|Latitude of measurement point|
+|time|datetime|UTC Timestamp of what time the forecast covers|
+|calculation_time|datetime|UTC Timestamp of when the forecast was made|
+|forecast_type|str|Name of the forecast type/source|
+|temperature_2m|float|Temperature (K) at 2m|
+|temperature_100m|float|Temperature (K) at 100m|
+|wind_speed_10m|float|Wind speed (m/s) at 10m|
+|wind_direction_10m|float|Wind direction (deg) at 10m|
+|wind_speed_100m|float|Wind speed (m/s) at 100m|
+|wind_direction_100m|float|Wind direction (deg) at 100m|
+|direct_radiation|float|Short wave radiation (solar W/m2)|
+|global_radiation|float|Short wave radiation per hour|
+|global_radiation_ny|float|Short wave radiation per hour (extra)|
+|accumulated_global_radiation|float|Accumulated daliy radiation (W/m2)|
 
 ## Getting Started
 
@@ -65,7 +64,7 @@ The python script can probably run on any python 3.9+ version, but your best opt
 
 #### Docker
 
-Built and tested on version 20.10.7.
+Built and tested on version 20.10.12.
 
 #### HELM (only relevant if using HELM for deployment)
 
@@ -84,15 +83,15 @@ docker build forecast-parser/ -t forecast-parser:latest
 docker volume create forecast-files
 ````
 
-3. Start the container in docker (change hosts to fit your environment - KSQL_HOST is not required as stated above)
+3. Start the container in docker
 ````bash
-docker run -v forecast-files:/forecast-files -e KAFKA_HOST=127.0.0.1:9092 -e KSQL_HOST=127.0.0.1:8088 -it --rm forecast-parser:latest
+docker run -p 5000:5000 -v forecast-files:/app/weatherforecasts/ -it --rm forecast-parser:latest
 ````
 The container will now be running interactively and you will be able to see the log output. To parse a forecast, it will have to be delivered to the volume somehow. This can be done by another container mapped to the same volume, or manually from another bash-client
 
-To mock output data and show debugging information, use the two flags USE_MOCK_DATA and DEBUG:
+To mock output data and show debugging information, use the two flags USE_MOCK_DATA and LOGLEVEL:
 ````bash
-docker run -v forecast-files:/forecast-files -e DEBUG=TRUE -e USE_MOCK_DATA=TRUE -e KAFKA_HOST=127.0.0.1:9092 -e KSQL_HOST=127.0.0.1:8088 -it --rm forecast-parser:latest
+docker run -p 5000:5000 -e USE_MOCK_DATA=TRUE -e LOGLEVEL=DEBUG -v forecast-files:/app/weatherforecasts/ -it --rm forecast-parser:latest
 ````
 
 Manual file-move to the volume (please verify volume-path is correct before trying this):
@@ -102,17 +101,18 @@ sudo cp forecast-parser/tests/valid-testdata/EnetEcm_2010010100.txt /var/lib/doc
 
 ## Help
 
-* Be aware: There are at least two kafka-python-brokers available - make sure to use the correct one (see app/requirements.txt file).
-
-For anything else, please submit an issue or ask the authors.
+Please submit an issue or ask the authors.
 
 ## Version History
-
+* 2.0.0:
+    * Drop kafka and kSQL implementation and switch to REST API.
+    * Restructure code, introducing classes
+    * Update Dockerfile and helm charts to newer "standard"
 * 1.1.3:
     * First production-ready version
     <!---* See [commit change]() or See [release history]()--->
 
-Older versions are not included in the README version history. For detauls on them, see the main-branch commit history, but beware: it was the early start and it was part of the learning curve, so it is not pretty. They are kept as to not disturb the integrity of the history.
+Older versions are not included in the README version history. For detaols on them, see the main-branch commit history, but beware: it was the early start and it was part of the learning curve, so it is not pretty. They are kept as to not disturb the integrity of the history.
 
 ## License
 

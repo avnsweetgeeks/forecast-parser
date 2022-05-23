@@ -7,7 +7,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/energinet-singularity/forecast-parser/energinet-singularity/forecast-parser
   pullPolicy: IfNotPresent
-  tag: "1.1.5"
+  tag: "2.0.0"
 
 #Setup file-mover dependency first
 forecastInputVolume: 
@@ -47,16 +47,22 @@ file-mover:
                 - S1
           topologyKey: "kubernetes.io/hostname"
 
-#Specifying local variables
-kafka:
-  topic: weather-forecast-raw
-  host: my-cluster-kafka-brokers:9092
-
-ksql:
-  host: kafka-cp-ksql-server:8088
-
-#Debug: "TRUE"
-#MockData: "TRUE"
+#Environment variables
+EnvVars:
+  #LOGLEVEL: "INFO"
+  #API_DBNAME: "weather_forecast"
+  #API_PORT: 5000
+  #ECM_FILE_FILTER: "EnetEcm_\d{10}\.txt"
+  #ECM_TYPE_NAME: "EnetEcm"
+  #NEA_FILE_FILTER: "ENetNEA_\d{10}\.txt"
+  #NEA_TYPE_NAME: "ENetNEA"
+  #CONWX_FILE_FILTER: "ConWx_prog_\d{10}_\d{3}\.dat"
+  #CONWX_TYPE_NAME: "ConWx"
+  #FORECAST_PATH: "/app/weatherforecasts/"
+  #TEMPLATE_PATH: "/app/"
+  #GRID_POINT_PATH: "app/gridpoints.csv"
+  #USE_MOCK_DATA: "FALSE"
+  #FOLDER_SCAN_INTERVAL_S: 10
 
 podLabels:
   forecast-fm-parser: "S1"
