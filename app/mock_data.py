@@ -59,12 +59,25 @@ def dummy_input_planner(template_path: str, output_path: str):
                     r"%Y%m%d%H", (dt.now() - td(hours=config["delay_h"])).timetuple()
                 )
                 new_filename = config["filename"].replace("<timestamp>", new_timestamp)
-                dummy_ouput_writer(template_file=template_file.path,
-                                   output_file=os.path.join(output_path, new_filename),
-                                   time_correction_h=config["delay_h"])
+                dummy_output_writer(
+                    template_file=template_file.path,
+                    output_file=os.path.join(output_path, new_filename),
+                    time_correction_h=config["delay_h"],
+                )
 
 
-def dummy_ouput_writer(template_file: str, output_file: str, time_correction_h: int):
+def dummy_output_writer(template_file: str, output_file: str, time_correction_h: int):
+    """Write output-file based on template with hour-correction
+
+    Parameters
+    ----------
+    template_file : str
+       Full path to the template file
+    output_file : str
+        Full path for output-file
+    time_correction_h : int
+        Correction in hours (file start-time will be set back this many hours)
+    """
     try:
         with open(template_file) as f:
             template = f.read().split("\n")
@@ -124,7 +137,7 @@ def change_dummy_timestamp(
                     new_row = (
                         new_row[: match.start()]
                         + time.strftime(r"%Y%m%d%H", new_time.timetuple())
-                        + new_row[match.end():]
+                        + new_row[match.end() :]
                     )
         new_contents.append(new_row)
 

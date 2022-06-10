@@ -52,7 +52,7 @@ def get_conwx_helpers(geo_coordinate_file_path: str) -> dict:
     Returns
     -------
     dict
-        Dictionary containing 'column_map' for the ConWX-parser
+        Dictionary containing 'column_map' and 'geo_coordinates' for ConWX
     """
     try:
         column_map = {
@@ -122,7 +122,7 @@ def dmi_parser(file_contents: list[str], helpers: dict) -> pd.DataFrame:
                     data_array.clear()
 
                 if "Valid times:" in line:
-                    time_index = line[len("# Valid times: "):].split()
+                    time_index = line[len("# Valid times: ") :].split()
                 else:
                     try:
                         parameter = helpers["column_map"][
@@ -196,10 +196,10 @@ def conwx_parser(file_contents: list[str], helpers: dict) -> pd.DataFrame:
         parameter = ""
 
         calculation_time = pd.to_datetime(
-            file_contents[0][len("#date="):].rstrip(), format=DT_FORMAT, utc=True
+            file_contents[0][len("#date=") :].rstrip(), format=DT_FORMAT, utc=True
         )
-        forecast_horizon = int(file_contents[2][len("#maxlen="):]) - int(
-            file_contents[1][len("#minlen="):]
+        forecast_horizon = int(file_contents[2][len("#maxlen=") :]) - int(
+            file_contents[1][len("#minlen=") :]
         )
         time_index = [
             (calculation_time + td(hours=h)) for h in range(forecast_horizon + 1)

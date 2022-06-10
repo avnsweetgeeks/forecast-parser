@@ -15,6 +15,21 @@ log = logging.getLogger()
 
 
 class WeatherForecast:
+    """Class for storing weather forecasts and their settings
+
+    Attributes
+    ----------
+    type : str
+        Name describing the type of forecast (i.e. ConWx)
+    file_filter : str
+        Regex-based string to identify a file to ID as this forecast type
+    helpers : dict
+        Dictionary of required helpers for parsing the file (the dict is
+        passed to the parsing function)
+    df : pd.DataFrame (Read only)
+        Pandas DataFrame containing the forecast data
+    """
+
     type: str
     file_filter: str
     helpers: dict
@@ -32,12 +47,34 @@ class WeatherForecast:
         parser: Callable[[list[str], dict], pd.DataFrame],
         helpers: dict = {},
     ) -> None:
+        """Create a new WeatherForecast object
+
+        Parameters
+        ----------
+        type : str
+            Name describing the type of forecast (i.e. ConWx)
+        file_filter : str
+            Regex-based string to identify a file to ID as this forecast type
+        parser : Callable[[list[str], dict], pd.DataFrame]
+            Function which can parse the file - will receive the file contents
+            as a list of lines and the 'helpers' dict and must return a pandas
+            DataFrame
+        helpers : dict, optional
+            Dictionary with information used by the parser, by default {}
+        """
         self.type = type
         self.file_filter = file_filter
         self.__parser = parser
         self.helpers = helpers
 
     def load(self, file_contents: list[str]) -> None:
+        """Update forecast DataFrame with new data
+
+        Parameters
+        ----------
+        file_contents : list[str]
+            Contents of a forecast-file
+        """
         try:
             self.__df = self.__parser(file_contents, self.helpers)
         except Exception as e:
@@ -45,11 +82,28 @@ class WeatherForecast:
 
 
 class ForecastManager:
+    """Class for managing multiple forecasts and the API
+
+    Attributes
+    ----------
+    DataFrame : pd.DataFrame (Read only)
+        Pandas DataFrame containing all forecast data
+    """
+
     __forecasts: dict[WeatherForecast]
     __api: singuapi
     __dbname: str
 
     def __init__(self, api: singuapi, dbname: str) -> None:
+        """Create a new ForecastManager object
+
+        Parameters
+        ----------
+        api : singuapi
+            API where the DataFrame is served
+        dbname : str
+            Name of the database in the API object
+        """
         self.__forecasts = {}
         self.__api = api
         self.__dbname = dbname
@@ -103,13 +157,22 @@ class ForecastManager:
             return pd.DataFrame()
 
     def UpdateForecast(self):
+        """Create new combined forecast and assign it to the API"""
         forecast_dict = [
-            src.df.assign(forecast_type=src.type) for src in self.__forecasts.values() if src.df is not None
+            src.df.assign(forecast_type=src.type)
+            for src in self.__forecasts.values()
+            if src.df is not None
         ]
         self.__api[self.__dbname] = pd.concat(forecast_dict, ignore_index=True)
 
     def ScanPath(self, path: str):
-        """Check for new files in path and update manager if relevant."""
+        """Check for new files in path and update manager if relevant
+
+        Parameters
+        ----------
+        path : str
+            Path to scan for new forecast files
+        """
         parse_list = {}
 
         for forecast in self.__forecasts.values():
@@ -166,6 +229,18 @@ def load_file(file_path: str, remove_file_after_load: bool = True) -> list[str]:
 
 
 def get_manager(settings: configuration.Settings) -> ForecastManager:
+    """Create and return a ForecastManager given a settings-input
+
+    Parameters
+    ----------
+    settings : configuration.Settings
+        Set of configurations/settings used for initializing
+
+    Returns
+    -------
+    ForecastManager
+        Initialized ForecastManager instance
+    """
     forecast_api = singuapi(dbname=settings.API_DBNAME, port=settings.API_PORT)
     forecast_manager = ForecastManager(api=forecast_api, dbname=settings.API_DBNAME)
 
@@ -202,7 +277,9 @@ if __name__ == "__main__":
     if settings.USE_MOCK_DATA:
         log.info("Mock data enabled. Setting scheduler to run each hour at x:30.")
         schedule.every().hour.at(":30").do(
-            mock_data.dummy_input_planner, template_path=settings.TEMPLATE_PATH, output_path=settings.FORECAST_PATH
+            mock_data.dummy_input_planner,
+            template_path=settings.TEMPLATE_PATH,
+            output_path=settings.FORECAST_PATH,
         )
 
     forecast_manager = get_manager(settings=settings)
