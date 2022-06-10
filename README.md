@@ -103,6 +103,9 @@ import requests
 requests.post('http://localhost:5000/', json={"sql-query": 'SELECT * FROM weather_forecast LIMIT 5;'}).json()
 ````
 
+NOTE: If using mock data, it will take some time before data will be available through the API - up to two hours, as data will
+be dropped in the folder at "normal" times along the day.
+
 ## Help
 
 Please submit an issue or ask the authors.
