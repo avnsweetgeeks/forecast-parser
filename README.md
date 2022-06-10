@@ -29,7 +29,7 @@ The container has an option to generate mock-data. This is done by taking the te
 
 The DataFrame is made available through a REST API which accepts SQL-queries. More information on the API itself can be found [here](https://github.com/energinet-singularity/singupy/tree/main/singupy#class-apidataframeapi).
 
-The dataframe contains the following columns/indexes:
+The DataFrame contains the following columns/indexes:
 | Name | type | description |
 |--|--|--|
 |lon|float|Longitude of measurement point|
@@ -55,8 +55,6 @@ The quickest way to have something running is through docker (see the section [R
 Feel free to either import the python-file as a lib or run it directly - or use HELM to spin it up as a pod in kubernetes. These methods are not documented and you will need the know-how yourself (the files have been prep'ed to our best ability though).
 
 ### Dependencies
-
-To run the script a kafka broker must be available (use the 'KAFKA_HOST' environment variable). Furthermore a kSQL server should be available (use the 'KSQL_HOST' environment variable) - if unavaliable, the application will still run but error-messages will be logged periodically.
 
 #### Python (if not run as part of the container)
 
@@ -97,6 +95,12 @@ docker run -p 5000:5000 -e USE_MOCK_DATA=TRUE -e LOGLEVEL=DEBUG -v forecast-file
 Manual file-move to the volume (please verify volume-path is correct before trying this):
 ````bash
 sudo cp forecast-parser/tests/valid-testdata/EnetEcm_2010010100.txt /var/lib/docker/volumes/forecast-files/_data/
+````
+
+4. To get some output from the dataframe, use postman, curl or the requests-package in python
+````python
+import requests
+requests.post('http://localhost:5000/', json={"sql-query": 'SELECT * FROM weather_forecast LIMIT 5;'}).json()
 ````
 
 ## Help
