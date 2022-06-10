@@ -43,7 +43,7 @@ def __load_settings_from_env(settings: Settings) -> Settings:
         A settings where all set environment variables have been overwritten
     """
     try:
-        if os.environ.get("LOGLEVEL").upper() == "DEBUG":
+        if os.environ.get("LOGLEVEL", "").upper() == "DEBUG":
             enable_debug_log()
 
         attributes = [attr for attr in dir(settings) if not attr.startswith("_")]
