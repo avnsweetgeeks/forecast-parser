@@ -39,10 +39,12 @@ def get_dmi_helpers() -> dict:
 
 
 def get_conwx_helpers(geo_coordinate_file_path: str) -> dict:
-    """Creates a helper-dict for parsing DMI files
+    """Creates a helper-dict for parsing ConWx files
 
-    The DMI files have headers that need to be translated into standard names
-    in the DataFrame output. This function generates this mapping.
+    The ConWx files have headers that need to be translated into standard names
+    in the DataFrame output. Furthermore the point IDs of the measurements in
+    the forecast files need to be translated into a geographical coordinate set
+    which can be mapped based on the input file.
 
     Parameters
     ----------
@@ -168,8 +170,13 @@ def conwx_parser(file_contents: list[str], helpers: dict) -> pd.DataFrame:
     - First 13 lines contains forecast metadata/header info
     - Lines starting with hash contain a new parameter name for following rows
     - Rows without a hash are data-rows
-    - First two columns are a coordinate set which can be looked up in file
-      which is included in helper dict.
+    - First two columns are a coordinate set which must be translated
+        - The mapping must be included in the helper dict
+        - It is based on a 42 x 42 grid, where the first column is one
+          dimension and the second column is the other dimension.
+        - The two values must be translated to an integer grid ID.
+            - Example: [1 1] = 1 + (1 -1) * 42 = 1
+            - Example: [13 11] = 13 + (11-1) * 42 = 13 + 420 = 433
     - All lines containing "-99" values are outside requested area
     - Temperatures are in C - must be translated to K (add 273.15)
 
@@ -191,6 +198,9 @@ def conwx_parser(file_contents: list[str], helpers: dict) -> pd.DataFrame:
     try:
         DF_INDEX = ["lon", "lat", "time"]
         DT_FORMAT = "%Y%m%d%H"
+        ABSOLUTE_ZERO_C = 273.15 # See docstring / C to K static value
+        GRID_MAX = 42
+
         data_array = []
         df_out = pd.DataFrame({i: [] for i in DF_INDEX}).set_index(DF_INDEX)
         parameter = ""
@@ -221,7 +231,8 @@ def conwx_parser(file_contents: list[str], helpers: dict) -> pd.DataFrame:
                 ]
             else:
                 if float(line.split()[4]) != -99:
-                    grid_id = int(line.split()[0]) + (int(line.split()[1]) - 1) * 42
+                    # For more info on grid_id, see the docstring.
+                    grid_id = int(line.split()[0]) + (int(line.split()[1]) - 1) * GRID_MAX
                     data_array.append(
                         {
                             "lon": helpers["geo_coordinates"][grid_id]["lon"],
@@ -235,8 +246,8 @@ def conwx_parser(file_contents: list[str], helpers: dict) -> pd.DataFrame:
             pd.DataFrame(data_array).explode(["time", parameter]).set_index(DF_INDEX)
         )
         df_out["calculation_time"] = calculation_time
-        df_out["temperature_2m"] += 273.15
-        df_out["temperature_100m"] += 273.15
+        df_out["temperature_2m"] += ABSOLUTE_ZERO_C
+        df_out["temperature_100m"] += ABSOLUTE_ZERO_C
         df_out.fillna(0, inplace=True)
 
     except Exception as e:
